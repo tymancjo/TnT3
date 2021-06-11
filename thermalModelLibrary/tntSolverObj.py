@@ -37,6 +37,24 @@ from thermalModelLibrary import tntAir as tntA
 
 
 def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempStepAccuracy = 0.1, sortAir=True, debug=False):
+	"""
+	This version of the solver is intended to introduce better 
+	Air model. The idea is that it will reflect the air behavior 
+	in the enclosure. 
+	Key difference - to initiate the air solve on every step 
+	(or every nth step)
+	The Air mechanic itself is intended to be part of the of the Air
+	object. 
+
+	Action plan:
+	- solver on each step qualified as valid will report the Qconv energy for each element to the Air model
+	- solver will trigger Air.update()
+	- updated air object will return new T values for elements on next round
+
+	TODO:
+	- adding the Qconv_value to each element object
+
+	"""
 
 	# # Filling the element.inputs and element.output lists
 	# elementsForObjSolver(Elements) 
