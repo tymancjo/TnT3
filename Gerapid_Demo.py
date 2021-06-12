@@ -26,10 +26,10 @@ def Ta(height):
 
 # setting current as function of time
 def Iload(time):
-    if time < 1:
-        return 0 #A constant value for now.
-    else:
+    if time < 3600:
         return 4500 #A constant value for now.
+    else:
+        return 0 #A constant value for now.
 
 # Defining the solution accuracy as function of time (we can control the precision and play with solving time)
 # This can be useful in analysis like shortcircuit 
@@ -189,9 +189,10 @@ tntS.nodePosXY(ThermalElements)
 SolutionTime = 4 # [h]
 startTime = datetime.now()
 # Running the solver - defined as function 
-Time,T,s, L2, XY, air = tntS.Solver(ThermalElements,Iload,Ta,T0,SolutionTime*60*60,1, Dokladnosc, debug=True)
+# Time,T,s, L2, XY, air = tntS.Solver(ThermalElements,Iload,Ta,T0,SolutionTime*60*60,1, Dokladnosc, debug=True)
+Time,T,s, L2, XY, air = tntS.SolverAdvance(ThermalElements,Iload,T0,T0,SolutionTime*60*60,1, Dokladnosc, debug=True, phases=1)
 
-# Total calulation time display
+# Total calculation time display
 print('Calculations are done in: {}'.format(datetime.now()-startTime))
 
 
@@ -221,6 +222,11 @@ axG2 = figG2.add_subplot(111, aspect='equal')
 tIndex = -1 # which element of the solution in time use for the colormap - set as the last one
 tntS.drawElements(axG2,ThermalElements[10:39],np.array(b[tIndex,10:39]), Text=True, T0=0)
 axG2.title.set_text('Heat Map')
+
+# plot samej temperatury powietrza. 
+figG3 = plt.figure('Air temperature')
+axG3 = figG3.add_subplot(111)
+axG3.plot(t,np.array(air.T_array))
 
 
 plt.show()

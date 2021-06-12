@@ -36,7 +36,7 @@ import copy
 from thermalModelLibrary import tntAir as tntA
 
 
-def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempStepAccuracy = 0.1, sortAir=True, debug=False):
+def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempStepAccuracy = 0.1, sortAir=True, debug=False, legacy_air=False, phases=3):
 	"""
 	This version of the solver is intended to introduce better 
 	Air model. The idea is that it will reflect the air behavior 
@@ -52,7 +52,8 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 	- updated air object will return new T values for elements on next round
 
 	TODO:
-	- adding the Qconv_value to each element object
+	- preparing a list of tuples to be used as a input for AirObj
+		- it will have a tuple (Q,y-height)
 
 	"""
 
@@ -100,7 +101,7 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 	else:
 		# we create air based on library
 		useF = True
-		air = tntA.airObject( 20, 1.2 * maxY, Tamb)
+		air = tntA.airAdvance( 20, 1.2 * maxY, Tamb, phases=phases)
 
 		# generating sources to static solve Air
 		for element in Elements:
@@ -115,8 +116,9 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 				else:
 					air.addQ(element.y, element.Power(current, Tamb))
 
-		air.solveT(sortAir) # updating the Air temperature dist 1- sorted 0-unsorted by values from top
-		print(air.aCellsT)
+		if legacy_air:
+			air.solveT(sortAir) # updating the Air temperature dist 1- sorted 0-unsorted by values from top
+			print(air.aCellsT)
 		Tamb = air.T
 
 		# for now, we just solve the air once before everything
@@ -156,6 +158,9 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 		timestepValid = True  # assuming this timestep will be ok
 		index = 0
 
+		# the vector of data for the AirObj model
+		air_input = []
+
 		for element in Elements:
 			# Getting the Tamb for this element:
 			# Depending if this given by function of y or just value
@@ -188,9 +193,9 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 			# solving for the convection heat taken out
 			Qconv = element.Qconv(elementPrevTemp, elementTamb)
 			Q -= Qconv
+
 			# preparing for Air update basd on Qconv for all elements
-			# air.addQ(element.y, Qconv)
-			# this is disabled becouse was unstable
+			air_input.append((Qconv, element.y))
 
 			#  solving for the radiation heat taken out
 			Q -= element.Qrad(elementPrevTemp, elementTamb)
@@ -262,6 +267,10 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 		if timestepValid: #  only if we take this step as valid one
 			Time.append(Time[-1] + deltaTime) #adding next time step to list
 			GlobalTemperatures.append(currentStepTemperatures)
+
+			# triggering the update of the air model. 
+			air.update(air_input, deltaTime)
+
 
 			# adding the previous step T as internal T for each element
 			for index, element in enumerate(Elements):
