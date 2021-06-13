@@ -101,7 +101,7 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 	else:
 		# we create air based on library
 		useF = True
-		air = tntA.airAdvance( 20, 1.2 * maxY, Tamb, phases=phases)
+		air = tntA.airAdvance( 10, 1.2 * maxY, Tamb, phases=phases)
 
 		# generating sources to static solve Air
 		for element in Elements:

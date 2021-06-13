@@ -97,7 +97,7 @@ class airObject(object):
 class airAdvance(object):
 	"""docstring for airObject"""
 
-	def __init__(self, nAir, hAir, T0, rAir=1,HTC=500,aDensity=1.225,Cp=1.006e3,phases=3):
+	def __init__(self, nAir, hAir, T0, rAir=1,HTC=80,aDensity=1.225,Cp=1.006e3,phases=3):
 		# grabbinng inputs here
 		self.n = nAir
 		self.h = hAir
@@ -187,7 +187,7 @@ class airAdvance(object):
 			Q = self.Q[x]
 			# energy dissipated out via the aCellOutArea
 			Qout = (self.T_array[-1][x] - self.T0) * self.aCellOurArea * self.HTC
-			print(f"Q{x} : {Q} / {Qout}; dt {dTime}")
+			# print(f"Q{x} : {Q} / {Qout}; dt {dTime}")
 			Q -= Qout
 
 			# if x > 0:
@@ -208,24 +208,29 @@ class airAdvance(object):
 			# Recalculating the element temperature
 			E = Q * dTime
 			dT = E / (self.mass * self.Cp)
-			print(f"dT: {dT}")
+			# print(f"dT: {dT}")
 
 			self.aCellsT[x] += dT
+			self.Q[x] = Q
 		# crazy man hot air rise modeling
 		# idea one - just sort this stuff.
-		# self.aCellsT = np.sort(self.aCellsT)
+		print("-----")
+		print(self.aCellsT)
+		self.aCellsT = np.sort(self.aCellsT)
 		# this didn't really worked nice
 
 		# looping over the air calls 
-		for y in range(len(self.aCellsT)-1):
-			this = self.aCellsT[y]
-			above = self.aCellsT[y+1]
-			if this > above:
-				this = (self.T0 + this) / 2
-				above = (above+this) /2
+		# for y in range(len(self.aCellsT)-1):
+		# 	if y = 0:
 
-				self.aCellsT[y] = this  
-				self.aCellsT[y+1] = above 
+		# 	this = self.aCellsT[y]
+		# 	above = self.aCellsT[y+1]
+		# 	if this > above:
+		# 		this = (self.T0 + this) / 2
+		# 		above = (above+this) /2
+
+		# 		self.aCellsT[y] = this  
+		# 		self.aCellsT[y+1] = above 
 
 		print(self.aCellsT)
 

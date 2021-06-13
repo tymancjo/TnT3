@@ -186,7 +186,7 @@ ThermalElements.extend(Lab_BBB)
 tntS.nodePosXY(ThermalElements)
 
 # Preparing to solve
-SolutionTime = 4 # [h]
+SolutionTime = 6 # [h]
 startTime = datetime.now()
 # Running the solver - defined as function 
 # Time,T,s, L2, XY, air = tntS.Solver(ThermalElements,Iload,Ta,T0,SolutionTime*60*60,1, Dokladnosc, debug=True)
@@ -229,6 +229,6 @@ axG3 = figG3.add_subplot(211)
 axG3.plot(t,np.array(air.T_array))
 
 axG4 = figG3.add_subplot(212)
-axG4.plot(np.array(air.T_array[-1]))
+axG4.bar(range(air.n),np.array(air.T_array[-1]))
 
 plt.show()
