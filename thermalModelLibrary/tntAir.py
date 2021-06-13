@@ -122,6 +122,7 @@ class airAdvance(object):
 		self.Q = np.zeros(self.n)
 		self.T_array.append(copy.copy(self.aCellsT))
 		self.aCellOurArea = 2 * pi * self.r * self.aCellH * 1e-3
+		self.Rth_up = 500
 
 
 	def resetQ(self):
@@ -189,12 +190,43 @@ class airAdvance(object):
 			print(f"Q{x} : {Q} / {Qout}; dt {dTime}")
 			Q -= Qout
 
+			# if x > 0:
+			# 	# heat transfer from cell below
+			# 	deltaT = (self.T_array[-1][x-1] - self.T_array[-1][x])
+			# 	if deltaT > 0:
+			# 		Q_from_below = deltaT * self.Rth_up
+			# 		Q += Q_from_below
+
+			# if x < self.n - 1:
+			# 	# heat transfer to cell above
+			# 	deltaT = (self.T_array[-1][x] - self.T_array[-1][x+1])
+			# 	if deltaT > 0:
+			# 		Q_to_above = deltaT * self.Rth_up
+			# 		Q -= Q_to_above
+
+
 			# Recalculating the element temperature
 			E = Q * dTime
 			dT = E / (self.mass * self.Cp)
 			print(f"dT: {dT}")
 
 			self.aCellsT[x] += dT
+		# crazy man hot air rise modeling
+		# idea one - just sort this stuff.
+		# self.aCellsT = np.sort(self.aCellsT)
+		# this didn't really worked nice
+
+		# looping over the air calls 
+		for y in range(len(self.aCellsT)-1):
+			this = self.aCellsT[y]
+			above = self.aCellsT[y+1]
+			if this > above:
+				this = (self.T0 + this) / 2
+				above = (above+this) /2
+
+				self.aCellsT[y] = this  
+				self.aCellsT[y+1] = above 
+
 		print(self.aCellsT)
 
 		self.T_array.append(copy.copy(self.aCellsT))

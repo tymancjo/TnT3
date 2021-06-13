@@ -29,7 +29,7 @@ def Iload(time):
     if time < 3600:
         return 4500 #A constant value for now.
     else:
-        return 0 #A constant value for now.
+        return 4500 #A constant value for now.
 
 # Defining the solution accuracy as function of time (we can control the precision and play with solving time)
 # This can be useful in analysis like shortcircuit 
@@ -225,8 +225,10 @@ axG2.title.set_text('Heat Map')
 
 # plot samej temperatury powietrza. 
 figG3 = plt.figure('Air temperature')
-axG3 = figG3.add_subplot(111)
+axG3 = figG3.add_subplot(211)
 axG3.plot(t,np.array(air.T_array))
 
+axG4 = figG3.add_subplot(212)
+axG4.plot(np.array(air.T_array[-1]))
 
 plt.show()
