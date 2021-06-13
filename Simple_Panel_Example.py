@@ -62,7 +62,7 @@ VBB_hor_btm = tntO.thermalElement(
         material = Cu)
 
 MBB = tntO.thermalElement(
-        shape = tntO.shape(10,30,50,4,0),
+        shape = tntO.shape(10,30,50,1,0),
         HTC = HTC,
         emissivity = emmisivity,
         material = Cu)
@@ -110,7 +110,8 @@ for element in PC_VBB:
 # 4h analysis end time
 # 500s as the default and max timestep size - this is auto reduced when needed - see tntS.Solver object
 # 0.01K maximum allowed temperature change in single timestep - otherwise solution accuracy - its used for auto timestep selection 
-A,B,s, L2, XY, air = tntS.Solver(PC_VBB,2000,20,20,8*60*60, 5, 0.01)
+# A,B,s, L2, XY, air = tntS.Solver(PC_VBB,2000,20,20,8*60*60, 5, 0.01)
+A,B,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,2000,20,20,8*60*60, 5, 0.01)
 
 # this returns:
 #  A vector of time for each step
@@ -163,7 +164,7 @@ boxes = tntS.drawElements(ax3,PC_VBB,np.array(b[-1,:]))
 
 ax4 = ax3.twiny()
 if air:
-    ax4.plot(air.aCellsT, np.linspace(0,air.h,air.n) ,'b--', label='air')
+    ax4.plot(air.T_array[-1], np.linspace(0,air.h,air.n) ,'b--', label='air')
 else:
     ax4.plot(np.array([Ta(y) for y in np.linspace(0,max(L2),20)]), np.linspace(0,max(L2),20) ,'b--', label='air')
 

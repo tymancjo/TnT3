@@ -97,7 +97,7 @@ class airObject(object):
 class airAdvance(object):
 	"""docstring for airObject"""
 
-	def __init__(self, nAir, hAir, T0, rAir=1,HTC=80,aDensity=1.225,Cp=1.006e3,phases=3):
+	def __init__(self, nAir, hAir, T0, rAir=1,HTC=1,aDensity=1.225,Cp=1.006e3,phases=3):
 		# grabbinng inputs here
 		self.n = nAir
 		self.h = hAir
