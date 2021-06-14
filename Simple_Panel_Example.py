@@ -13,6 +13,7 @@ import numpy as np
 # Libraries ot the tnt model
 from thermalModelLibrary import tntObjects as tntO
 from thermalModelLibrary import tntSolverObj as tntS
+from thermalModelLibrary import tntAir as tntA
 
 # Defining some materials
 Cu = tntO.Material(conductivity=56e6)
@@ -93,11 +94,12 @@ tntS.elementsForObjSolver(PC_VBB)
 
 
 # Filling elements positions x,y in each elemnt object
-tntS.nodePosXY(PC_VBB)
+maxY = tntS.nodePosXY(PC_VBB)
 
 # shifting the lowest part to 300mm as it is in real
 for element in PC_VBB:
     element.y += 300
+maxY += 300
 
 # setting current as function of time
 def Iload(time):
@@ -116,7 +118,17 @@ def Iload(time):
 # 500s as the default and max timestep size - this is auto reduced when needed - see tntS.Solver object
 # 0.01K maximum allowed temperature change in single timestep - otherwise solution accuracy - its used for auto timestep selection 
 # A,B,s, L2, XY, air = tntS.Solver(PC_VBB,2000,20,20,8*60*60, 5, 0.01)
-A,B,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,Iload,35,35,8*60*60, 5, 0.01)
+
+# Defining the air object
+air = tntA.airAdvance( 20, 2300, 35,HTC=5,rAir=0.3, phases=3)
+# air = 35
+A,B,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,
+                                        Iload,
+                                        air,
+                                        35,
+                                        15*60*60,
+                                        5,
+                                        0.01)
 
 # this returns:
 #  A vector of time for each step
@@ -138,8 +150,7 @@ t = t / (60*60) # Time in hours
 
 # preparing temp rises as results
 b = np.array(B)
-b = b - 20
-
+b = b - air.T0
 
 # defining the main plot window
 fig = plt.figure('Temperature Rise Analysis ')
@@ -169,11 +180,12 @@ boxes = tntS.drawElements(ax3,PC_VBB,np.array(b[-1,:]))
 
 ax4 = ax3.twiny()
 if air:
-    ax4.plot(10*air.T_array[-1], np.linspace(0,air.h,air.n) ,'b--', label='air')
+    ax4.plot(air.T_array[-1], np.linspace(0,air.h,air.n) ,'b--', label='air')
 else:
     ax4.plot(p.array([Ta(y) for y in np.linspace(0,max(L2),20)]), np.linspace(0,max(L2),20) ,'b--', label='air')
 
-ax4.plot([element.T for element in PC_VBB],[element.y for element in PC_VBB],'r--', label='nodes')
+# ax4.plot([element.T for element in PC_VBB],[element.y for element in PC_VBB],'r--', label='nodes')
+ax4.plot(B[-1],[element.y for element in PC_VBB],'r--', label='nodes')
 
 plt.xlabel('Temp [degC]')
 plt.legend()
