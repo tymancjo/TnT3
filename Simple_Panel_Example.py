@@ -62,7 +62,7 @@ VBB_hor_btm = tntO.thermalElement(
         material = Cu)
 
 MBB = tntO.thermalElement(
-        shape = tntO.shape(10,30,50,1,0),
+        shape = tntO.shape(10,30,50,4,0),
         HTC = HTC,
         emissivity = emmisivity,
         material = Cu)
@@ -99,7 +99,12 @@ tntS.nodePosXY(PC_VBB)
 for element in PC_VBB:
     element.y += 300
 
-
+# setting current as function of time
+def Iload(time):
+    if time < 3600:
+        return 1500 #A constant value for now.
+    else:
+        return 1500 #A constant value for now.
 
   
 # Running the solver for
@@ -111,7 +116,7 @@ for element in PC_VBB:
 # 500s as the default and max timestep size - this is auto reduced when needed - see tntS.Solver object
 # 0.01K maximum allowed temperature change in single timestep - otherwise solution accuracy - its used for auto timestep selection 
 # A,B,s, L2, XY, air = tntS.Solver(PC_VBB,2000,20,20,8*60*60, 5, 0.01)
-A,B,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,2000,20,20,8*60*60, 5, 0.01)
+A,B,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,Iload,35,35,8*60*60, 5, 0.01)
 
 # this returns:
 #  A vector of time for each step
@@ -140,14 +145,14 @@ b = b - 20
 fig = plt.figure('Temperature Rise Analysis ')
 
 # first subplot for the timecurves
-ax1 = fig.add_subplot(221)
+ax1 = fig.add_subplot(231)
 ax1.plot(t,b[:,:])
 ax1.set_title('Temp Rise vs. Time')
 plt.ylabel('Temp Rise [K]')
 plt.xlabel('Time [h]')
 
 # Temperature rises from lats timepoint along the 1D model length
-ax2 = fig.add_subplot(223)
+ax2 = fig.add_subplot(234)
 
 ax2.plot(b[-1,::-1],'rx--')
 ax2.set_title('Temp Rise vs. 1D position')
@@ -158,15 +163,15 @@ ax1.grid()
 ax2.grid()
 
 # Defining the subplot for geometry heat map
-ax3 = fig.add_subplot(122, aspect='equal')
+ax3 = fig.add_subplot(132, aspect='equal')
 # runs the defined procedure on this axis
 boxes = tntS.drawElements(ax3,PC_VBB,np.array(b[-1,:]))
 
 ax4 = ax3.twiny()
 if air:
-    ax4.plot(air.T_array[-1], np.linspace(0,air.h,air.n) ,'b--', label='air')
+    ax4.plot(10*air.T_array[-1], np.linspace(0,air.h,air.n) ,'b--', label='air')
 else:
-    ax4.plot(np.array([Ta(y) for y in np.linspace(0,max(L2),20)]), np.linspace(0,max(L2),20) ,'b--', label='air')
+    ax4.plot(p.array([Ta(y) for y in np.linspace(0,max(L2),20)]), np.linspace(0,max(L2),20) ,'b--', label='air')
 
 ax4.plot([element.T for element in PC_VBB],[element.y for element in PC_VBB],'r--', label='nodes')
 
@@ -175,5 +180,13 @@ plt.legend()
 
 plt.tight_layout()
 
-plt.show()
+# plot samej temperatury powietrza. 
+# figG3 = plt.figure('Air temperature')
+axG3 = fig.add_subplot(233)
+axG3.plot(np.array(air.T_array))
+axG3.set_title("Air temp vs. time")
 
+axG4 = fig.add_subplot(236)
+axG4.bar(range(air.n),np.array(air.T_array[-1]))
+axG4.set_title("Air segments temp")
+plt.show()

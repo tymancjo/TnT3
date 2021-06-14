@@ -101,7 +101,7 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 	else:
 		# we create air based on library
 		useF = True
-		air = tntA.airAdvance( 30, 1.2 * maxY, Tamb, phases=phases)
+		air = tntA.airAdvance( 5, 1.01 * maxY, Tamb, phases=phases)
 
 		# generating sources to static solve Air
 		for element in Elements:
@@ -269,8 +269,8 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 			GlobalTemperatures.append(currentStepTemperatures)
 
 			# triggering the update of the air model. 
-			air.update(air_input, deltaTime)
-
+			for _ in range(2):
+				air.update(air_input, deltaTime / 2)
 
 			# adding the previous step T as internal T for each element
 			for index, element in enumerate(Elements):

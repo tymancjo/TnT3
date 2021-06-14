@@ -97,7 +97,7 @@ class airObject(object):
 class airAdvance(object):
 	"""docstring for airObject"""
 
-	def __init__(self, nAir, hAir, T0, rAir=1,HTC=1,aDensity=1.225,Cp=1.006e3,phases=3):
+	def __init__(self, nAir, hAir, T0, rAir=1,HTC=5,aDensity=1.225,Cp=1.006e3,phases=3):
 		# grabbinng inputs here
 		self.n = nAir
 		self.h = hAir
@@ -122,7 +122,7 @@ class airAdvance(object):
 		self.Q = np.zeros(self.n)
 		self.T_array.append(copy.copy(self.aCellsT))
 		self.aCellOurArea = 2 * pi * self.r * self.aCellH * 1e-3
-		self.Rth_up = 500
+		self.Rth_up = 50
 
 
 	def resetQ(self):
@@ -141,7 +141,7 @@ class airAdvance(object):
 		# function returning the temperature at given height
 		return self.aCellsT[self.airCell(Y)]
 
-	def setG(self, Gup=5, Gdwn=0, Gout=2):
+	def setG(self, Gup=0, Gdwn=0, Gout=0):
 	# def setG(self, Gup=0, Gdwn=0, Gout=1):
 		# Gup is thermal cond to the top
 		# Gdwn is thermal cond down
@@ -154,13 +154,13 @@ class airAdvance(object):
 			for j in range(self.n):
 				# lets treat j as row i as col
 				if i == j: # the N case
-					self.G[i][j] = +Gup +Gdwn +Gout
+					self.G[j][i] = +Gup +Gdwn +Gout
 				elif i == j-1: # the N-1 case
-					self.G[i][j] = -Gdwn
+					self.G[j][i] = -Gdwn
 				elif i == j+1: # the N+1 case
-					self.G[i][j] = -Gup
+					self.G[j][i] = -Gup
 
-		self.invG = np.linalg.inv(self.G)
+		# self.invG = np.linalg.inv(self.G)
 
 
 
@@ -171,51 +171,71 @@ class airAdvance(object):
 		
 		"""
 		dT = np.matmul(self.invG, self.Q)
-		self.aCellsT = dT + self.T0
-		if srt:
-			self.aCellsT = np.sort(self.aCellsT)
+		return dT
+		# self.aCellsT = dT + self.T0
+		# if srt:
+		# 	self.aCellsT = np.sort(self.aCellsT)
+
+	def solveQ(self):
+		"""
+		Solving matrix equations for Q
+		"""
+		return np.matmul(self.G, self.aCellsT)
 
 	def update(self, Q_vector, dTime):
 		"""
 		Solving the air elements with the data from the elements.
 		"""
+		self.HTC = 0.25
 		self.resetQ()
 		for inQ in Q_vector:
 			self.addQ(inQ[1], inQ[0], self.phases)
-
+		
+		# self.Q += self.solveQ()
+		
 		for x in range(self.n):
 			Q = self.Q[x]
 			# energy dissipated out via the aCellOutArea
 			Qout = (self.T_array[-1][x] - self.T0) * self.aCellOurArea * self.HTC
-			# print(f"Q{x} : {Q} / {Qout}; dt {dTime}")
+			# # print(f"Q{x} : {Q} / {Qout}; dt {dTime}")
 			Q -= Qout
 
-			# if x > 0:
-			# 	# heat transfer from cell below
-			# 	deltaT = (self.T_array[-1][x-1] - self.T_array[-1][x])
-			# 	if deltaT > 0:
-			# 		Q_from_below = deltaT * self.Rth_up
-			# 		Q += Q_from_below
+		# 	if x > 0:
+		# 		# heat transfer from cell below
+		# 		deltaT = (self.T_array[-1][x-1] - self.T_array[-1][x])
+		# 		if deltaT > 0:
+		# 			Q_from_below = deltaT * self.Rth_up
+		# 		else:
+		# 			Q_from_below = deltaT * self.Rth_up * 0.0
+		# 		Q += Q_from_below
 
-			# if x < self.n - 1:
-			# 	# heat transfer to cell above
-			# 	deltaT = (self.T_array[-1][x] - self.T_array[-1][x+1])
-			# 	if deltaT > 0:
-			# 		Q_to_above = deltaT * self.Rth_up
-			# 		Q -= Q_to_above
+		# 	if x < self.n - 1:
+		# 		# heat transfer to cell above
+		# 		deltaT = (self.T_array[-1][x+1] - self.T_array[-1][x])
+		# 		if deltaT < 0:
+		# 			Q_to_above = deltaT * self.Rth_up
+		# 		else:
+		# 			Q_to_above = deltaT * self.Rth_up * 0.0
+		# 		Q += Q_to_above
+		# 	else:
+		# 		deltaT = (self.T0 - self.T_array[-1][x] )
+		# 		Q_to_above = deltaT * 0.2 * self.Rth_up
+		# 		Q += Q_to_above
+
 
 
 			# Recalculating the element temperature
 			E = Q * dTime
 			dT = E / (self.mass * self.Cp)
-			# print(f"dT: {dT}")
+		# 	# print(f"dT: {dT}")
 
 			self.aCellsT[x] += dT
-			self.Q[x] = Q
 		# crazy man hot air rise modeling
 		# idea one - just sort this stuff.
+		self.aCellsT[0] = (self.aCellsT[0] + self.T0) /2
+		self.aCellsT = np.linspace(self.aCellsT[0], max(self.aCellsT),self.n)
 		print("-----")
-		print(self.aCellsT)
+		# print(self.aCellsT)
 		self.aCellsT = np.sort(self.aCellsT)
 		# this didn't really worked nice
 
