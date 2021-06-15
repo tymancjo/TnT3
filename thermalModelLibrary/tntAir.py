@@ -1,8 +1,11 @@
 # The soltion file for air thermal simulation
 
 from math import pi
+import math
 import numpy as np
 import copy
+
+from numpy.core.fromnumeric import sort
 
 """
 The main idea is to create a model of air to make it simulate the temperatre rise vs. the height.
@@ -99,6 +102,7 @@ class airAdvance(object):
 
 	def __init__(self, nAir, hAir, T0, rAir=1,HTC=5,aDensity=1.225,Cp=1.006e3,phases=3):
 		# grabbinng inputs here
+
 		self.n = nAir
 		self.h = hAir
 		self.r = rAir
@@ -106,9 +110,8 @@ class airAdvance(object):
 		self.T_array = []
 		self.HTC = HTC
 
-		self.volume = pi * self.r**2 * self.h * 1e-3
-		self.mass = self.volume * aDensity
 		self.Cp = Cp
+		self.AirDensity = aDensity
 		
 		self.phases = phases
 
@@ -117,12 +120,13 @@ class airAdvance(object):
 
 	def initialize(self, T0):
 		# doing some setum internal math
-		self.aCellH = self.h / self.n
-		self.aCellsT = np.array([1.0 * T0 for i in range(self.n)])
+		self.aCellH = 1.0 * self.h / self.n
+		self.aCellsT = np.ones(self.n) * T0
 		self.Q = np.zeros(self.n)
 		self.T_array.append(copy.copy(self.aCellsT))
 		self.aCellOurArea = 2 * pi * self.r * self.aCellH * 1e-3
-		self.Rth_up = 50
+		self.volume = pi * self.r**2 * self.aCellH * 1e-3
+		self.mass = self.volume * self.AirDensity
 
 
 	def resetQ(self):
@@ -182,82 +186,75 @@ class airAdvance(object):
 		"""
 		return np.matmul(self.G, self.aCellsT)
 
+	def accererationUp(Tx,Ta=25, h=300):
+		# ideal gas constans
+		R = 8.3144598 #[J/mol*K]
+
+		# molar mass of dry air
+		M = 28.97e-3 # [kg/mol]
+
+		# temperature lapse rate 
+		L = 0.0065 #[K/m]
+
+		# sea level ref temperature
+		T0 = 288.15 #[K]
+
+		# gravitational acceleration
+		g = 9.81 #[m/s^2]
+
+		# Tx temperature of the hot element in degC
+		# Ta ambient temperature in deg C
+		# h height above sea level in m
+		
+		t0 = Ta + T0;
+		tx = Tx + T0;
+
+		A = ((1/t0) * (1-(L*h/t0))**((g*M/(R*L))-1))
+		B = ((1/tx) * (1-(L*h/tx))**((g*M/(R*L))-1))
+		
+		return g * (A - B) / B
+
 	def update(self, Q_vector, dTime):
 		"""
 		Solving the air elements with the data from the elements.
 		"""
-		self.HTC = 0.25
+		max_dT = 1 # assuming max air temp change to be 1K
+		maximum_dT = 20
+		
 		self.resetQ()
 		for inQ in Q_vector:
 			self.addQ(inQ[1], inQ[0], self.phases)
 		
-		# self.Q += self.solveQ()
-		
-		for x in range(self.n):
-			Q = self.Q[x]
-			# energy dissipated out via the aCellOutArea
-			Qout = (self.T_array[-1][x] - self.T0) * self.aCellOurArea * self.HTC
-			# # print(f"Q{x} : {Q} / {Qout}; dt {dTime}")
-			Q -= Qout
-
-		# 	if x > 0:
-		# 		# heat transfer from cell below
-		# 		deltaT = (self.T_array[-1][x-1] - self.T_array[-1][x])
-		# 		if deltaT > 0:
-		# 			Q_from_below = deltaT * self.Rth_up
-		# 		else:
-		# 			Q_from_below = deltaT * self.Rth_up * 0.0
-		# 		Q += Q_from_below
-
-		# 	if x < self.n - 1:
-		# 		# heat transfer to cell above
-		# 		deltaT = (self.T_array[-1][x+1] - self.T_array[-1][x])
-		# 		if deltaT < 0:
-		# 			Q_to_above = deltaT * self.Rth_up
-		# 		else:
-		# 			Q_to_above = deltaT * self.Rth_up * 0.0
-		# 		Q += Q_to_above
-		# 	else:
-		# 		deltaT = (self.T0 - self.T_array[-1][x] )
-		# 		Q_to_above = deltaT * 0.2 * self.Rth_up
-		# 		Q += Q_to_above
-
-
-
-			# Recalculating the element temperature
-			E = Q * dTime
-			dT = E / (self.mass * self.Cp)
-		# 	# print(f"dT: {dT}")
-
-			self.aCellsT[x] += dT
-		# crazy man hot air rise modeling
-		# idea one - just sort this stuff.
-		self.aCellsT[0] = (self.aCellsT[0] + self.T0) /2
-		self.aCellsT = np.linspace(self.aCellsT[0], max(self.aCellsT),self.n)
-		print("-----")
-		# print(self.aCellsT)
-		self.aCellsT = np.sort(self.aCellsT)
-		# this didn't really worked nice
-
-		# looping over the air calls 
-		# for y in range(len(self.aCellsT)-1):
-		# 	if y = 0:
-
-		# 	this = self.aCellsT[y]
-		# 	above = self.aCellsT[y+1]
-		# 	if this > above:
-		# 		this = (self.T0 + this) / 2
-		# 		above = (above+this) /2
-
-		# 		self.aCellsT[y] = this  
-		# 		self.aCellsT[y+1] = above 
-
-		print(self.aCellsT)
-
-		self.T_array.append(copy.copy(self.aCellsT))
+		Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
+		self.Q -= Q_out
 			
+		E = self.Q * dTime
+		dT = E / (self.mass * self.Cp)
+		maximum_dT = max(dT)
 
+		# if maximum_dT > max_dT:
+		# 	self.Q += Q_out
+		# 	new_dT = 0.8 * dTime * max_dT / maximum_dT
+		# 	steps = math.ceil(dTime / new_dT)
+		# 	dTime = dTime / steps
+		# 	print(f"splitting time to: {steps}")
 
+		# 	for _ in range(steps):
+		# 		Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
+		# 		self.Q -= Q_out
 
+		# 		E = self.Q * dTime
+		# 		dT = E / (self.mass * self.Cp)
+		# 		self.aCellsT += dT
+		# 		# print(f"Q {self.Q}, Qout{Q_out}")
+		# else:
+		# 	self.aCellsT += dT
+			# print(f"Q {self.Q}, Qout{Q_out}")
 
+		self.aCellsT += dT
 
+		# Analysing the air movement
+		
+		tempT = np.sort(self.aCellsT)
+		self.aCellsT = np.maximum(tempT, self.aCellsT)
+		self.T_array.append(copy.copy(self.aCellsT))

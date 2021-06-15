@@ -32,11 +32,21 @@ import math
 # to be able to make the deep copy of each object
 import copy
 
+from numpy.linalg import qr
+from numpy.linalg.linalg import _qr_dispatcher
+
 # self made library for Air model
 from thermalModelLibrary import tntAir as tntA
 
 
-def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempStepAccuracy = 0.1, sortAir=True, debug=False, legacy_air=False, phases=3):
+def SolverAdvance(Elements, 
+				current, 
+				Tamb, 
+				T0, 
+				EndTime, 
+				iniTimeStep = 1, 
+				tempStepAccuracy = 0.1, 
+				sortAir=True, debug=False, legacy_air=False, phases=3):
 	"""
 	This version of the solver is intended to introduce better 
 	Air model. The idea is that it will reflect the air behavior 
@@ -56,15 +66,6 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 		- it will have a tuple (Q,y-height)
 
 	"""
-
-	# # Filling the element.inputs and element.output lists
-	# elementsForObjSolver(Elements) 
-	# # Preparing some geometry data for each node element
-	# # Calculating the each node 2D position based on the Elements vector
-	# # XY = nodePosXY(Elements)
-	
-	# # calulating each element x and y
-	# nodePosXY(Elements)
 	
 	# we will use this same loop as well to check if all elements have already T set
 	elementsHaveT = True
@@ -74,57 +75,64 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 	for element in Elements:
 		maxY = max(maxY, element.y)
 
+		# Checking if Elements have already a internal temperature not eq to Null
+		# if yes then use this as starting temperature 
+		# (this allows continue calc from previous results)
+		# if no - we assume the T0
 		if not element.T:
 			elementsHaveT = False
-
-	# Checking if Elements have already a internal temperature not eq to Null
-	# if yes then use this as starting temperature (this allows continue calc from previous results)
-	# if no - we assume the T0
-
-	if not elementsHaveT:
-		for element in Elements:
 			element.T = T0
+
 	
 	Temperatures = [x.T for x in Elements]  # array of temperatures iof elements in given timestep
 
 	# preparing some variables
 	GlobalTemperatures = [Temperatures] # array of temperature results
 
-	# Checking if the delivered Tamb is a function or a value
-	# if it is a function, each element will have Tamb = f(element y position)
-	# else is just a value
-	if callable(Tamb):
-		print('Tamb is a function')
+	
+	# Checking if the Tabm is already an instance of the tntA.airAdvance
+	if isinstance(Tamb, tntA.airAdvance):
+		print("Using delivered Air Model")
+		air = copy.copy(Tamb)
 		useF = True
-		air = None
-
-	else:
-		# we create air based on library
-		useF = True
-		air = tntA.airAdvance( 5, 1.01 * maxY, Tamb, phases=phases)
-
-		# generating sources to static solve Air
-		for element in Elements:
-			if element.current is not False:
-				if callable(element.current):					
-					air.addQ(element.y, element.Power(element.current(EndTime/2), Tamb))
-				else:
-					air.addQ(element.y, element.Power(element.current, Tamb))
-			else:
-				if callable(current):					
-					air.addQ(element.y, element.Power(current(EndTime/2), Tamb))
-				else:
-					air.addQ(element.y, element.Power(current, Tamb))
-
-		if legacy_air:
-			air.solveT(sortAir) # updating the Air temperature dist 1- sorted 0-unsorted by values from top
-			print(air.aCellsT)
 		Tamb = air.T
+	else:
+			
+		# Checking if the delivered Tamb is a function or a value
+		# if it is a function, each element will have Tamb = f(element y position)
+		# else is just a value
+		if callable(Tamb):
+			print('Tamb is a function')
+			useF = True
+			air = None
 
-		# for now, we just solve the air once before everything
-		# based only on the internal heat generation
-		# later plan: do it on each step
-		# or mabe Lets start from this second plan :)
+		else:
+			# we create air based on library
+			useF = True
+			air = tntA.airAdvance( 15, 1.01 * maxY, Tamb, phases=phases)
+
+			# generating sources to static solve Air
+			for element in Elements:
+				if element.current is not False:
+					if callable(element.current):					
+						air.addQ(element.y, element.Power(element.current(EndTime/2), Tamb))
+					else:
+						air.addQ(element.y, element.Power(element.current, Tamb))
+				else:
+					if callable(current):					
+						air.addQ(element.y, element.Power(current(EndTime/2), Tamb))
+					else:
+						air.addQ(element.y, element.Power(current, Tamb))
+
+			if legacy_air:
+				air.solveT(sortAir) # updating the Air temperature dist 1- sorted 0-unsorted by values from top
+				print(air.aCellsT)
+			Tamb = air.T
+
+			# for now, we just solve the air once before everything
+			# based only on the internal heat generation
+			# later plan: do it on each step
+			# or mabe Lets start from this second plan :)
 
 	
 	Time = [0]
@@ -137,8 +145,6 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 	while (Time[-1] <= EndTime):
 		# Main loop over time
 		SolverSteps += 1 #  to keep track how real solver iterations was done
-		# For Printing console info for progress review each n steps
-		SolverControlSteps += 1 #  to keep track how real solver iterations was done
 		
 		# Upadate in 0.2 
 		# if timestepValid:
@@ -156,12 +162,11 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 		currentStepTemperatures = [] # empty array to keep this timestep
 
 		timestepValid = True  # assuming this timestep will be ok
-		index = 0
 
 		# the vector of data for the AirObj model
 		air_input = []
 
-		for element in Elements:
+		for index,element in enumerate(Elements):
 			# Getting the Tamb for this element:
 			# Depending if this given by function of y or just value
 			if useF:
@@ -194,11 +199,12 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 			Qconv = element.Qconv(elementPrevTemp, elementTamb)
 			Q -= Qconv
 
-			# preparing for Air update basd on Qconv for all elements
-			air_input.append((Qconv, element.y))
-
 			#  solving for the radiation heat taken out
-			Q -= element.Qrad(elementPrevTemp, elementTamb)
+			Qrad = element.Qrad(elementPrevTemp, elementTamb) 
+			Q -= Qrad
+
+			# preparing for Air update basd on Qconv for all elements
+			air_input.append((Qconv+Qrad, element.y))
 
 			# ###################################################
 			# solving the conduction heat transfer
@@ -225,8 +231,6 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 					Q -= deltaT / Rth
 
 			# having the total power calculating the energy
-			# print(Q) # just for debug
-
 			elementEnergy = Q * deltaTime
 
 			temperatureRise = elementEnergy / (element.mass() * element.material.Cp)
@@ -237,10 +241,8 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 			else:
 				tSA = tempStepAccuracy
 
-
 			if abs(temperatureRise) > tSA:
 				timestepValid = False # Setting the flag to ignore this step
-
 
 			# calculating the new time step to meet the tempStepAccuracy
 			# for this element (doing it every time Upadate in v0.2)
@@ -257,11 +259,7 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 					SolverControlSteps = 0
 					print('Progress: {} ksol.stp, {:.4f} [s], Max T: {:.4f}degC, {} valid stp'.format(SolverSteps/1000, Time[-1], max(GlobalTemperatures[-1]), len(Time)))
 
-
 			currentStepTemperatures.append(elementPrevTemp + temperatureRise)
-
-			# inceasing the index of element
-			index += 1
 
 		#  Adding current timestep solutions to master array
 		if timestepValid: #  only if we take this step as valid one
@@ -269,8 +267,7 @@ def SolverAdvance(Elements, current, Tamb, T0, EndTime, iniTimeStep = 1, tempSte
 			GlobalTemperatures.append(currentStepTemperatures)
 
 			# triggering the update of the air model. 
-			for _ in range(2):
-				air.update(air_input, deltaTime / 2)
+			air.update(air_input, deltaTime)
 
 			# adding the previous step T as internal T for each element
 			for index, element in enumerate(Elements):
@@ -513,6 +510,7 @@ def nodePosXY(Elements):
 	and store this positions in each node object internal x,y 
 	"""
 	minY = 0.0
+	maxY = 0.0
 
 	Elements[0].x = 0
 	Elements[0].y = 0
@@ -531,10 +529,13 @@ def nodePosXY(Elements):
 
 
 		minY = min(minY, element.y)
+		maxY = max(maxY, element.y)
 
-	# making shift to put onject minY to 0
+	# making shift to put elements minY to 0
 	for element in Elements:
 		element.y = element.y - minY
+
+	return maxY - minY
 		
 
 def drawElements(axis, Elements, Temperatures=[], Text=False, T0=25, TextStep=1):
