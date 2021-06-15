@@ -187,6 +187,10 @@ class airAdvance(object):
 		return np.matmul(self.G, self.aCellsT)
 
 	def accererationUp(Tx,Ta=25, h=300):
+		# Tx temperature of the hot element in degC
+		# Ta ambient temperature in deg C
+		# h height above sea level in m
+
 		# ideal gas constans
 		R = 8.3144598 #[J/mol*K]
 
@@ -201,10 +205,6 @@ class airAdvance(object):
 
 		# gravitational acceleration
 		g = 9.81 #[m/s^2]
-
-		# Tx temperature of the hot element in degC
-		# Ta ambient temperature in deg C
-		# h height above sea level in m
 		
 		t0 = Ta + T0;
 		tx = Tx + T0;
