@@ -46,7 +46,8 @@ def SolverAdvance(Elements,
 				EndTime, 
 				iniTimeStep = 1, 
 				tempStepAccuracy = 0.1, 
-				sortAir=True, debug=False, legacy_air=False, phases=3):
+				sortAir=True, debug=False, legacy_air=False, phases=3,
+				maxTimeStep = 2):
 	"""
 	This version of the solver is intended to introduce better 
 	Air model. The idea is that it will reflect the air behavior 
@@ -93,7 +94,8 @@ def SolverAdvance(Elements,
 	# Checking if the Tabm is already an instance of the tntA.airAdvance
 	if isinstance(Tamb, tntA.airAdvance):
 		print("Using delivered Air Model")
-		air = copy.copy(Tamb)
+		# air = copy.copy(Tamb)
+		air = Tamb
 		useF = True
 		Tamb = air.T
 	else:
@@ -157,6 +159,8 @@ def SolverAdvance(Elements,
 		
 		# Upadate in 0.2
 		deltaTime = min(proposedDeltaTime) # choosing minimumum step from previous calculations for all elements that didnt meet accuracy
+		deltaTime = min(deltaTime, maxTimeStep)
+
 		proposedDeltaTime = []  # keeper for calculated new delata time reset
 
 		currentStepTemperatures = [] # empty array to keep this timestep

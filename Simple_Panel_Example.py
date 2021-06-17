@@ -9,6 +9,7 @@ startTime = datetime.now()
 import matplotlib.pyplot as plt #to biblioteka pozwalajaca nam wykreslać wykresy
 
 import numpy as np
+import copy
 
 # Libraries ot the tnt model
 from thermalModelLibrary import tntObjects as tntO
@@ -74,9 +75,9 @@ MBB = tntO.thermalElement(
 #  (nodeElement, Number of such elemnts in serial)
 PC_VBB =      [
                 (MBB, 5),
-                (VBB, int(900/50)), # ~900mm
+                (VBB, int(200/50)), # ~900mm
                 (ACB, 4),
-                (VBB, 4), # ~200mm
+                (VBB, int(600/50)), # ~200mm
                 (VBB_hor_btm, 2), # Lashe for CT ~130mm
                 (VBB, 4), # ~200mm
                 (zwora, 2)
@@ -106,7 +107,7 @@ def Iload(time):
     if time < 3600:
         return 1500 #A constant value for now.
     else:
-        return 1500 #A constant value for now.
+        return 0 #A constant value for now.
 
   
 # Running the solver for
@@ -120,16 +121,31 @@ def Iload(time):
 # A,B,s, L2, XY, air = tntS.Solver(PC_VBB,2000,20,20,8*60*60, 5, 0.01)
 
 # Defining the air object
-air = tntA.airAdvance( 20, 2300, 35,HTC=5,rAir=0.3, phases=3)
-# air = 35
+air = tntA.airAdvance( 10, 2300, 35,HTC=5,rAir=0.3,
+                        phases=3, 
+                        linear=1, sort=0)
+
+air2 = tntA.airAdvance( 10, 2300, 35,HTC=5,rAir=0.3,
+                        phases=3, 
+                        linear=0, sort=1)
+
 A,B,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,
                                         Iload,
                                         air,
                                         35,
-                                        15*60*60,
+                                        6*60*60,
                                         5,
                                         0.01)
+# air2.aCellsT = copy.copy(air.aCellsT)
+# air2.T_array = copy.copy(air.T_array)
 
+# A2,B2,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,
+#                                         1000,
+#                                         air,
+#                                         35,
+#                                         12*60*60,
+#                                         5,
+#                                         0.01)
 # this returns:
 #  A vector of time for each step
 #  B array of temperature rises for each element in each step
@@ -145,6 +161,8 @@ print('thermal nodes: ', len(PC_VBB))
 
 
 # Rest is just cleaning up data for plotting
+# A2 = np.array(A2)+A[-1]
+# t = np.array(A+A2.tolist())
 t = np.array(A)
 t = t / (60*60) # Time in hours
 

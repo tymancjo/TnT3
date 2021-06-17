@@ -100,7 +100,7 @@ class airObject(object):
 class airAdvance(object):
 	"""docstring for airObject"""
 
-	def __init__(self, nAir, hAir, T0, rAir=1,HTC=5,aDensity=1.225,Cp=1.006e3,phases=3):
+	def __init__(self, nAir, hAir, T0, rAir=1,HTC=5,aDensity=1.225,Cp=1.006e3,phases=3,linear=True,sort=True):
 		# grabbinng inputs here
 
 		self.n = nAir
@@ -109,6 +109,8 @@ class airAdvance(object):
 		self.T0 = T0
 		self.T_array = []
 		self.HTC = HTC
+		self.linear = linear
+		self.sort = sort
 
 		self.Cp = Cp
 		self.AirDensity = aDensity
@@ -125,7 +127,8 @@ class airAdvance(object):
 		self.Q = np.zeros(self.n)
 		self.T_array.append(copy.copy(self.aCellsT))
 		self.aCellOurArea = 2 * pi * self.r * self.aCellH * 1e-3
-		self.volume = pi * self.r**2 * self.aCellH * 1e-3
+		self.footprint = pi * self.r**2 
+		self.volume = self.footprint * self.aCellH * 1e-3	
 		self.mass = self.volume * self.AirDensity
 
 
@@ -186,33 +189,6 @@ class airAdvance(object):
 		"""
 		return np.matmul(self.G, self.aCellsT)
 
-	def accererationUp(Tx,Ta=25, h=300):
-		# Tx temperature of the hot element in degC
-		# Ta ambient temperature in deg C
-		# h height above sea level in m
-
-		# ideal gas constans
-		R = 8.3144598 #[J/mol*K]
-
-		# molar mass of dry air
-		M = 28.97e-3 # [kg/mol]
-
-		# temperature lapse rate 
-		L = 0.0065 #[K/m]
-
-		# sea level ref temperature
-		T0 = 288.15 #[K]
-
-		# gravitational acceleration
-		g = 9.81 #[m/s^2]
-		
-		t0 = Ta + T0;
-		tx = Tx + T0;
-
-		A = ((1/t0) * (1-(L*h/t0))**((g*M/(R*L))-1))
-		B = ((1/tx) * (1-(L*h/tx))**((g*M/(R*L))-1))
-		
-		return g * (A - B) / B
 
 	def update(self, Q_vector, dTime):
 		"""
@@ -220,41 +196,45 @@ class airAdvance(object):
 		"""
 		max_dT = 1 # assuming max air temp change to be 1K
 		maximum_dT = 20
-		
+
 		self.resetQ()
 		for inQ in Q_vector:
 			self.addQ(inQ[1], inQ[0], self.phases)
 		
 		Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
+		# the roof cooling area including:
+		Q_out[-1] = (self.aCellsT[-1] - self.T0) * self.footprint * self.HTC
 		self.Q -= Q_out
 			
 		E = self.Q * dTime
 		dT = E / (self.mass * self.Cp)
-		maximum_dT = max(dT)
+		if maximum_dT > max_dT:
+			self.Q += Q_out
+			new_dT = 0.8 * dTime * max_dT / maximum_dT
+			steps = math.ceil(dTime / new_dT)
+			dTime = dTime / steps
+			print(f"splitting time to: {steps}")
 
-		# if maximum_dT > max_dT:
-		# 	self.Q += Q_out
-		# 	new_dT = 0.8 * dTime * max_dT / maximum_dT
-		# 	steps = math.ceil(dTime / new_dT)
-		# 	dTime = dTime / steps
-		# 	print(f"splitting time to: {steps}")
+			for _ in range(steps):
+				Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
+				# the roof cooling area including:
+				Q_out[-1] = (self.aCellsT[-1] - self.T0) * self.footprint * self.HTC
 
-		# 	for _ in range(steps):
-		# 		Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
-		# 		self.Q -= Q_out
+				self.Q -= Q_out
 
-		# 		E = self.Q * dTime
-		# 		dT = E / (self.mass * self.Cp)
-		# 		self.aCellsT += dT
-		# 		# print(f"Q {self.Q}, Qout{Q_out}")
-		# else:
-		# 	self.aCellsT += dT
-			# print(f"Q {self.Q}, Qout{Q_out}")
+				E = self.Q * dTime
+				dT = E / (self.mass * self.Cp)
+				self.aCellsT += dT
+				# print(f"Q {self.Q}, Qout{Q_out}")
+		else:
+			self.aCellsT += dT
+			print(f"Q {self.Q}, Qout{Q_out}")
+		# self.aCellsT += dT
 
-		self.aCellsT += dT
+		# artificial air stratificaton implementation
+		if self.linear:
+			self.aCellsT = np.linspace(self.aCellsT.min(), self.aCellsT.max(), self.n)
+		elif self.sort:
+			self.aCellsT = np.sort(self.aCellsT)
 
-		# Analysing the air movement
-		
-		tempT = np.sort(self.aCellsT)
-		self.aCellsT = np.maximum(tempT, self.aCellsT)
 		self.T_array.append(copy.copy(self.aCellsT))
