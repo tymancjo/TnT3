@@ -11,8 +11,8 @@ from numpy.core.fromnumeric import sort
 The main idea is to create a model of air to make it simulate the temperatre rise vs. the height.
 
 Solution finding steps:
-1. make procrdure to map element Y to a best air cell element
-2. make air cell elements heat transfer calulation - static model
+1. make procedure to map element Y to a best air cell element
+2. make air cell elements heat transfer calculations - static model
 3. make the model dynamic - air is moving
 
 ad.1.
