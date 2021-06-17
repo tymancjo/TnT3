@@ -3,17 +3,21 @@
 # IMPORTS
 # for performance measurement
 from datetime import datetime
-# memorizing statrup time
+# memorizing startup time
 startTime = datetime.now()
+# graph plotting library
+import matplotlib.pyplot as plt 
 
-import matplotlib.pyplot as plt #to biblioteka pozwalajaca nam wykreslać wykresy
-
+# array math library 
 import numpy as np
 import copy
 
-# Libraries ot the tnt model
+# Libraries of the tnt model
+# this one describe the basic objects
 from thermalModelLibrary import tntObjects as tntO
+# this one brings the pre processors, solver, and drawing functionality
 from thermalModelLibrary import tntSolverObj as tntS
+# This one describe the Air models
 from thermalModelLibrary import tntAir as tntA
 
 # Defining some materials
@@ -21,12 +25,8 @@ Cu = tntO.Material(conductivity=56e6)
 CuACB = tntO.Material(conductivity=7e6)
 
 # Defining some handy vallues
-# IP42 parameters 
 HTC = 6
 emmisivity = 0.35
-
-# Enviroment and starting point
-Tambient = 20
 
 
 # Defining analysis elements objects
@@ -72,7 +72,7 @@ MBB = tntO.thermalElement(
 
 # Defining the analysis circuit/objects connection stream
 # this works like this:
-#  (nodeElement, Number of such elemnts in serial)
+#  (nodeElement, Number of such elements in series)
 PC_VBB =      [
                 (MBB, 5),
                 (VBB, int(200/50)), # ~900mm
@@ -83,18 +83,20 @@ PC_VBB =      [
                 (zwora, 2)
                 ]
 
-# This function clone the nodeelemnts based in tuples above
-# and create final 1D list of elements 
+# This function clone the node elements based on tuples above
+# and create final 1D list of elements for the further prepation
+# this is 1st stage of pre processor
 PC_VBB = tntS.generateList(PC_VBB) 
 
-# As the solver base on objects of nodes only we need to prepare
+# This pre processor step is setting up internals of each previously 
+# prepared nodes.
 # for each of node element internal lists of
 # element before and elements after
-# its done below
+# is done filled
 tntS.elementsForObjSolver(PC_VBB)
 
-
-# Filling elements positions x,y in each elemnt object
+# Filling elements positions x,y in each element object
+# this can be done now as we know the order of elements
 maxY = tntS.nodePosXY(PC_VBB)
 
 # shifting the lowest part to 300mm as it is in real
@@ -102,7 +104,7 @@ for element in PC_VBB:
     element.y += 300
 maxY += 300
 
-# setting current as function of time
+# setting current as function of time [s]
 def Iload(time):
     if time < 3600:
         return 1500 #A constant value for now.
@@ -110,48 +112,29 @@ def Iload(time):
         return 0 #A constant value for now.
 
   
-# Running the solver for
-# Geometry from list PC_VBB
-# 2500 A
-# 20 degC ambient
-# 20 degC starting temperature
-# 4h analysis end time
-# 500s as the default and max timestep size - this is auto reduced when needed - see tntS.Solver object
-# 0.01K maximum allowed temperature change in single timestep - otherwise solution accuracy - its used for auto timestep selection 
-# A,B,s, L2, XY, air = tntS.Solver(PC_VBB,2000,20,20,8*60*60, 5, 0.01)
-
 # Defining the air object
-air = tntA.airAdvance( 10, 2300, 35,HTC=5,rAir=0.3,
-                        phases=3, 
-                        linear=1, sort=0)
+air = tntA.airAdvance( 10, # n of elements
+                        2300, # total height [mm]
+                        35, # initial temperature degC
+                        HTC=5, # Heat exchange ratio to the "air in infinity"
+                        rAir=300, # radius of the air object cylinder [mm]
+                        phases=3, # number of phases represented by the geomentry
+                        linear=1, # if True (or 1) the Air temperature will be made as linear function of height
+                        sort=0) # if True (or 1) the Air elements are sorted from the coolest one to hottest (on top)
+# Running the solver 
+A,B,s, L2, _, air = tntS.SolverAdvance(PC_VBB, # element list
+                                        Iload, # current description - in [A]
+                                        air, # air model to be used
+                                        35, # initial temperature [deg C]
+                                        6*60*60, # analysis time [s]
+                                        5, # Initial time step [s] - is auto regulated by solver
+                                        0.01) # allowed max temperature change in one step [K]
 
-air2 = tntA.airAdvance( 10, 2300, 35,HTC=5,rAir=0.3,
-                        phases=3, 
-                        linear=0, sort=1)
-
-A,B,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,
-                                        Iload,
-                                        air,
-                                        35,
-                                        6*60*60,
-                                        5,
-                                        0.01)
-# air2.aCellsT = copy.copy(air.aCellsT)
-# air2.T_array = copy.copy(air.T_array)
-
-# A2,B2,s, L2, XY, air = tntS.SolverAdvance(PC_VBB,
-#                                         1000,
-#                                         air,
-#                                         35,
-#                                         12*60*60,
-#                                         5,
-#                                         0.01)
 # this returns:
-#  A vector of time for each step
-#  B array of temperature rises for each element in each step
+#  A vector of time for each step - as the timestep can vary its needed for plots.
+#  B array of temperatures for each element in each step
 #  s the total number of solver iterations (not neccessary the same as number of timesteps!)
 #  L2 vector of positions in [mm] for each temperature calculations point (each object middle)
-#  depreciated: XY - vector of 2D vectors of XY position of each node - None is returened - as now each element have its x and y
 
 # results from solver
 print('execution time: ', datetime.now() - startTime)
@@ -161,8 +144,6 @@ print('thermal nodes: ', len(PC_VBB))
 
 
 # Rest is just cleaning up data for plotting
-# A2 = np.array(A2)+A[-1]
-# t = np.array(A+A2.tolist())
 t = np.array(A)
 t = t / (60*60) # Time in hours
 
