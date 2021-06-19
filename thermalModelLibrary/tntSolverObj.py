@@ -562,7 +562,7 @@ def nodePosXY(Elements):
     return maxY - minY
         
 
-def drawElements(axis, Elements, Temperatures=[], Text=False, T0=25, TextStep=1):
+def drawElements(axis, Elements, Temperatures=[], Text=False, T0=25, TextStep=1, cLimits=None):
     """
     This method draws a result as a defined shape
     inputs:
@@ -678,6 +678,10 @@ def drawElements(axis, Elements, Temperatures=[], Text=False, T0=25, TextStep=1)
     # colored according to the temp rise
     shapes = PatchCollection(my_patches, cmap=mpl.cm.jet, alpha=1)
     shapes.set_array(Temperatures)
+    # if colorscale limits are defined:
+    if cLimits != None:
+        shapes.set_clim([cLimits[0], cLimits[1]])
+        
     # puttig it all into subplot
     axis.add_collection(shapes)
 
@@ -856,7 +860,7 @@ def generateList(Input):
     Input:
     list of object with repetitnion count for each as list of list:
     example:
-    [(Object1, Object1_count), (Object2, Object2_count)...]
+    [(Object1, Object1_count,iD-optional), (Object2, Object2_count,iD-optional)...]
 
     Output:
         List of elements ready for solver
@@ -869,6 +873,11 @@ def generateList(Input):
     for set in Input:
         for i in range(set[1]):
             output.append(copy.deepcopy(set[0]))
+            # adding an Id if setted up in the input
+            if len(set) > 2:
+                output[-1].iD = set[2]
+            else:
+                output[-1].iD = None 
 
     return output
 
