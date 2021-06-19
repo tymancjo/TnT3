@@ -2,6 +2,7 @@
 
 from math import pi
 import math
+from matplotlib.colors import from_levels_and_colors
 from matplotlib.pyplot import magnitude_spectrum
 import numpy as np
 import copy
@@ -17,20 +18,20 @@ Solution finding steps:
 3. make the model dynamic - air is moving, or faking the move
 
 ad.1.
-	lets assume fixed number of air elements in height
-		nAir
-	lest assume some height
-		hAir
-	Lets divide the height to air cells
-	lets figure out sizes and position of eaxh air cell
-	lest make a map function input: any Y -> output: air cell 
+    lets assume fixed number of air elements in height
+        nAir
+    lest assume some height
+        hAir
+    Lets divide the height to air cells
+    lets figure out sizes and position of eaxh air cell
+    lest make a map function input: any Y -> output: air cell 
 ad.2.
-	lets prepare the Q object vector of lenghth as air cells number
-	lets apply this vector as input element
-	lest calculate the heat distribution base on the thermal G
+    lets prepare the Q object vector of lenghth as air cells number
+    lets apply this vector as input element
+    lest calculate the heat distribution base on the thermal G
 ad.3.
-	lets solve the air temp rise on each step of the solver
-	by use of hte update() method. 
+    lets solve the air temp rise on each step of the solver
+    by use of hte update() method. 
 """
 
 
@@ -47,6 +48,7 @@ class airAdvance(object):
         self.r = rAir / 1000
         self.T0 = T0
         self.T_array = []
+        self.dT_array = []
         self.Q_array = []
         self.Qin_array = []
         self.Qout_array = []
@@ -70,6 +72,7 @@ class airAdvance(object):
         self.Q_array.append(np.zeros(self.n))
         self.Qin_array.append(np.zeros(self.n))
         self.Qout_array.append(np.zeros(self.n))
+        self.dT_array.append(np.zeros(self.n))
 
         self.Q = np.zeros(self.n)
 
@@ -107,51 +110,65 @@ class airAdvance(object):
 
         Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
         # the roof cooling area including:
-        Q_out[-1] = (self.aCellsT[-1] - self.T0) * self.footprint * self.HTC
+        Q_out[-1] += (self.aCellsT[-1] - self.T0) * self.footprint * self.HTC
         self.Q -= Q_out
 
         E = self.Q * dTime
         dT = E / (self.mass * self.Cp)
         maximum_dT = dT.max()
 
-        # if the change of temperature in this step is bigger then allowed
-        # the calculations are splitted to the smaller sub-steps
-        if maximum_dT > max_dT:
-            self.Q += Q_out  # resetting the previous change above
-            new_dT = 0.8 * dTime * max_dT / maximum_dT
-            steps = math.ceil(dTime / new_dT)
-            dTime = dTime / steps
-            print(f"splitting time to: {steps}")
+        # # if the change of temperature in this step is bigger then allowed
+        # # the calculations are splitted to the smaller sub-steps
+        # if maximum_dT > max_dT:
+        #     self.Q += Q_out  # resetting the previous change above
+        #     new_dT = 0.8 * dTime * max_dT / maximum_dT
+        #     steps = math.ceil(dTime / new_dT)
+        #     dTime = dTime / steps
+        #     print(f"splitting time to: {steps}")
 
-            for _ in range(steps):
-                Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
-                # the roof cooling area including:
-                Q_out[-1] = (self.aCellsT[-1] - self.T0) * \
-                    self.footprint * self.HTC
+        #     for _ in range(steps):
+        #         Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
+        #         # the roof cooling area including:
+        #         Q_out[-1] = (self.aCellsT[-1] - self.T0) * \
+        #             self.footprint * self.HTC
 
-                self.Q -= Q_out
+        #         self.Q -= Q_out
 
-                E = self.Q * dTime
-                dT = E / (self.mass * self.Cp)
-                self.aCellsT += dT
-                # print(f"Q {self.Q}, Qout{Q_out}")
-                self.Qout_array.append(copy.copy(Q_out))
-                self.Q_array.append(copy.copy(self.Q))
-        else:
-            self.aCellsT += dT
-            self.Qout_array.append(copy.copy(Q_out))
-            self.Q_array.append(copy.copy(self.Q))
-            # print(f"Q {self.Q}, Qout{Q_out}")
+        #         E = self.Q * dTime
+        #         dT = E / (self.mass * self.Cp)
+        #         self.aCellsT += dT
+        #         # print(f"Q {self.Q}, Qout{Q_out}")
+        #         self.Qout_array.append(copy.copy(Q_out))
+        #         self.Q_array.append(copy.copy(self.Q))
+        # else:
+        return dT, Q_out
+
+    def validateStep(self, dT, Q_out):
+
+        if self.linear:
+            # dT = np.sort(dT)
+            pass
+
+        self.aCellsT += dT
+
+        self.Qout_array.append(copy.copy(Q_out))
+        self.Q_array.append(copy.copy(self.Q))
+
 
         # artificial air stratificaton implementation
         # the linear is overwriting the sort
-        if self.linear:
-            self.aCellsT = np.linspace(
-                self.aCellsT.min(), self.aCellsT.max(), self.n)
-        elif self.sort:
+        # if self.linear:
+        #     from_ = min(self.aCellsT )
+        #     to_ = max(self.aCellsT)
+        #     self.aCellsT = np.linspace(
+        #         from_, to_, self.n)
+            # print(f"|{from_} |{to_}|")
+        if self.sort:
             self.aCellsT = np.sort(self.aCellsT)
 
         self.T_array.append(copy.copy(self.aCellsT))
+        self.dT_array.append(copy.copy(dT))
+
 
 
 class airObject(object):

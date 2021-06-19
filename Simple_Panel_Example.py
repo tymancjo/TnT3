@@ -106,17 +106,21 @@ maxY += 300
 
 # setting current as function of time [s]
 def Iload(time):
-    if time < 6*3600:
+    if time < 1*3600:
         return 1500 #A constant value for now.
+    elif time < 3*3600:
+        return 0    
+    elif time < 4*3600:
+        return 2221    
     else:
         return 0 #A constant value for now.
 
   
 # Defining the air object
-air = tntA.airAdvance(  10, # n of elements
+air = tntA.airAdvance(  22, # n of elements
                         2300, # total height [mm]
                         35, # initial temperature degC
-                        HTC=5, # Heat exchange ratio to the "air in infinity"
+                        HTC=5.0, # Heat exchange ratio to the "air in infinity"
                         rAir=300, # radius of the air object cylinder [mm]
                         phases=3, # number of phases represented by the geomentry
                         linear=1, # if True (or 1) the Air temperature will be made as linear function of height
@@ -126,10 +130,10 @@ A,B,s, L2, _, air = tntS.SolverAdvance(PC_VBB, # element list
                                         Iload, # current description - in [A]
                                         air, # air model to be used
                                         35, # initial temperature [deg C]
-                                        12*60*60, # analysis time [s]
+                                        9*60*60, # analysis time [s]
                                         5, # Initial time step [s] - is auto regulated by solver
-                                        0.01, # allowed max temperature change in one step [K]
-                                        maxTimeStep = 0.1) # maximum timestep
+                                        0.2, # allowed max temperature change in one step [K]
+                                        maxTimeStep = 0.2) # maximum timestep
 
 # this returns:
 #  A vector of time for each step - as the timestep can vary its needed for plots.
@@ -150,7 +154,7 @@ t = t / (60*60) # Time in hours
 
 # preparing temp rises as results
 b = np.array(B)
-# b = b - air.T0
+b = b - air.T0
 
 # defining the main plot window
 fig = plt.figure('Temperature Rise Analysis ')
@@ -194,8 +198,9 @@ plt.legend()
 # plot samej temperatury powietrza. 
 # figG3 = plt.figure('Air temperature')
 axG3 = fig.add_subplot(233)
-axG3.plot(np.array(air.T_array))
+axG3.plot(t,np.array(air.T_array))
 axG3.set_title("Air temp vs. time")
+axG3.grid()
 
 axG4 = fig.add_subplot(236)
 axG4.bar(range(air.n),np.array(air.T_array[-1]))
@@ -203,18 +208,25 @@ axG4.set_title("Air segments temp")
 
 plt.tight_layout()
 
-
 fig2 = plt.figure('Air debug plots')
-debug1 = fig2.add_subplot(131)
-debug1.plot(np.array(air.T_array))
+debug1 = fig2.add_subplot(221)
+debug1.plot(t,np.array(air.T_array))
 debug1.set_title('Temperatures')
 
-debug2 = fig2.add_subplot(132)
-debug2.plot(np.array(air.Q_array))
+debug2 = fig2.add_subplot(222)
+debug2.plot(t,np.array(air.Q_array))
 debug2.set_title('internalQ')
 
-debug3 = fig2.add_subplot(133)
-debug3.plot(np.array(air.Qout_array))
+debug3 = fig2.add_subplot(223)
+debug3.plot(t,np.array(air.Qout_array))
 debug3.set_title('Qout')
 
+debug4 = fig2.add_subplot(224)
+debug4.plot(t,np.array(air.dT_array))
+debug4.set_title('dT')
+
+debug1.grid()
+debug2.grid()
+debug3.grid()
+debug4.grid()
 plt.show()
