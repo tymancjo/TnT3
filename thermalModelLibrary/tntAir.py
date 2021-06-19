@@ -32,183 +32,193 @@ ad.3.
 	lets solve the air temp rise on each step of the solver
 	by use of hte update() method. 
 """
-		
+
 
 class airAdvance(object):
-	"""
-	This is the newly developed Air model in the TnT3
-	"""
+    """
+    This is the newly developed Air model in the TnT3
+    """
 
-	def __init__(self, nAir, hAir, T0, rAir=1, HTC=5, phases=3, linear=True, sort=True, aDensity=1.225, Cp=1.006e3):
-		# grabbing inputs here
+    def __init__(self, nAir, hAir, T0, rAir=1, HTC=5, phases=3, linear=True, sort=True, aDensity=1.225, Cp=1.006e3):
+        # grabbing inputs here
 
-		self.n = nAir
-		self.h = hAir
-		self.r = rAir / 1000
-		self.T0 = T0
-		self.T_array = []
-		self.HTC = HTC
-		self.linear = linear
-		self.sort = sort
+        self.n = nAir
+        self.h = hAir
+        self.r = rAir / 1000
+        self.T0 = T0
+        self.T_array = []
+        self.Q_array = []
+        self.Qin_array = []
+        self.Qout_array = []
+        self.HTC = HTC
+        self.linear = linear
+        self.sort = sort
 
-		self.Cp = Cp
-		self.AirDensity = aDensity
-		
-		self.phases = phases
+        self.Cp = Cp
+        self.AirDensity = aDensity
 
-		self.initialize(T0)
+        self.phases = phases
 
-	def initialize(self, T0):
-		# doing some setum internal math
-		self.aCellH = 1.0 * self.h / self.n
-		self.aCellsT = np.ones(self.n) * T0
-		self.Q = np.zeros(self.n)
-		self.T_array.append(copy.copy(self.aCellsT))
-		self.aCellOurArea = 2 * pi * self.r * self.aCellH * 1e-3
-		self.footprint = pi * self.r**2 
-		self.volume = self.footprint * self.aCellH * 1e-3	
-		self.mass = self.volume * self.AirDensity
+        self.initialize(T0)
 
+    def initialize(self, T0):
+        # doing some setum internal math
+        self.aCellH = 1.0 * self.h / self.n
 
-	def resetQ(self):
-		self.Q *= 0
+        self.aCellsT = np.ones(self.n) * T0
+        self.T_array.append(copy.copy(self.aCellsT))
+        self.Q_array.append(np.zeros(self.n))
+        self.Qin_array.append(np.zeros(self.n))
+        self.Qout_array.append(np.zeros(self.n))
 
-	def addQ(self, Y, Qin, phases=3):
-		self.Q[self.airCell(Y)] += Qin * phases
+        self.Q = np.zeros(self.n)
 
-	def airCell(self, Y):
-		# pointing any Y to propper air cell number
-		n = int(Y // self.aCellH)
-		# return (self.n - min(n, self.n)) - 1 # need to really rethink this
-		return min(n, self.n-1) # this original  logical one
+        self.aCellOurArea = 2 * pi * self.r * self.aCellH * 1e-3
+        self.footprint = pi * self.r**2
+        self.volume = self.footprint * self.aCellH * 1e-3
+        self.mass = self.volume * self.AirDensity
 
-	def T(self, Y):
-		# function returning the temperature at given height
-		return self.aCellsT[self.airCell(Y)]
+    def resetQ(self):
+        self.Q *= 0
 
-	def update(self, Q_vector, dTime):
-		"""
-		Solving the air elements with the data from the elements.
-		"""
-		max_dT = 1 # assuming max air temp change to be 1K
-		maximum_dT = 20
+    def addQ(self, Y, Qin, phases=3):
+        self.Q[self.airCell(Y)] += Qin * phases
 
-		self.resetQ()
-		for inQ in Q_vector:
-			self.addQ(inQ[1], inQ[0], self.phases)
-		
-		Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
-		# the roof cooling area including:
-		Q_out[-1] = (self.aCellsT[-1] - self.T0) * self.footprint * self.HTC
-		self.Q -= Q_out
-			
-		E = self.Q * dTime
-		dT = E / (self.mass * self.Cp)
-		maximum_dT = dT.max()
+    def airCell(self, Y):
+        # pointing any Y to propper air cell number
+        n = int(Y // self.aCellH)
+        # return (self.n - min(n, self.n)) - 1 # need to really rethink this
+        return min(n, self.n-1)  # this original  logical one
 
-		# if the change of temperature in this step is bigger then allowed
-		# the calculations are splitted to the smaller sub-steps
-		if maximum_dT > max_dT:
-			self.Q += Q_out
-			new_dT = 0.8 * dTime * max_dT / maximum_dT
-			steps = math.ceil(dTime / new_dT)
-			dTime = dTime / steps
-			print(f"splitting time to: {steps}")
+    def T(self, Y):
+        # function returning the temperature at given height
+        return self.aCellsT[self.airCell(Y)]
 
-			for _ in range(steps):
-				Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
-				# the roof cooling area including:
-				Q_out[-1] = (self.aCellsT[-1] - self.T0) * self.footprint * self.HTC
+    def update(self, Q_vector, dTime):
+        """
+        Solving the air elements with the data from the elements.
+        """
+        max_dT = 1  # assuming max air temp change to be 1K
+        maximum_dT = 20
 
-				self.Q -= Q_out
+        self.resetQ()
+        for inQ in Q_vector:
+            self.addQ(inQ[1], inQ[0], self.phases)
 
-				E = self.Q * dTime
-				dT = E / (self.mass * self.Cp)
-				self.aCellsT += dT
-				# print(f"Q {self.Q}, Qout{Q_out}")
-		else:
-			self.aCellsT += dT
-			print(f"Q {self.Q}, Qout{Q_out}")
+        Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
+        # the roof cooling area including:
+        Q_out[-1] = (self.aCellsT[-1] - self.T0) * self.footprint * self.HTC
+        self.Q -= Q_out
 
-		# artificial air stratificaton implementation
-		# the linear is overwriting the sort 
-		if self.linear:
-			self.aCellsT = np.linspace(self.aCellsT.min(), self.aCellsT.max(), self.n)
-		elif self.sort:
-			self.aCellsT = np.sort(self.aCellsT)
+        E = self.Q * dTime
+        dT = E / (self.mass * self.Cp)
+        maximum_dT = dT.max()
 
-		self.T_array.append(copy.copy(self.aCellsT))
+        # if the change of temperature in this step is bigger then allowed
+        # the calculations are splitted to the smaller sub-steps
+        if maximum_dT > max_dT:
+            self.Q += Q_out  # resetting the previous change above
+            new_dT = 0.8 * dTime * max_dT / maximum_dT
+            steps = math.ceil(dTime / new_dT)
+            dTime = dTime / steps
+            print(f"splitting time to: {steps}")
 
+            for _ in range(steps):
+                Q_out = (self.aCellsT - self.T0) * self.aCellOurArea * self.HTC
+                # the roof cooling area including:
+                Q_out[-1] = (self.aCellsT[-1] - self.T0) * \
+                    self.footprint * self.HTC
 
+                self.Q -= Q_out
+
+                E = self.Q * dTime
+                dT = E / (self.mass * self.Cp)
+                self.aCellsT += dT
+                # print(f"Q {self.Q}, Qout{Q_out}")
+                self.Qout_array.append(copy.copy(Q_out))
+                self.Q_array.append(copy.copy(self.Q))
+        else:
+            self.aCellsT += dT
+            self.Qout_array.append(copy.copy(Q_out))
+            self.Q_array.append(copy.copy(self.Q))
+            # print(f"Q {self.Q}, Qout{Q_out}")
+
+        # artificial air stratificaton implementation
+        # the linear is overwriting the sort
+        if self.linear:
+            self.aCellsT = np.linspace(
+                self.aCellsT.min(), self.aCellsT.max(), self.n)
+        elif self.sort:
+            self.aCellsT = np.sort(self.aCellsT)
+
+        self.T_array.append(copy.copy(self.aCellsT))
 
 
 class airObject(object):
-	"""
-	This model is left here for the legacy compatibility
-	docstring for airObject
-	"""
+    """
+    This model is left here for the legacy compatibility
+    docstring for airObject
+    """
 
-	def __init__(self, nAir, hAir, T0):
-		# grabbinng inputs here
-		self.n = nAir
-		self.h = hAir
-		self.T0 = T0
+    def __init__(self, nAir, hAir, T0):
+        # grabbinng inputs here
+        self.n = nAir
+        self.h = hAir
+        self.T0 = T0
 
-		self.update(T0)
-		self.setG()
+        self.update(T0)
+        self.setG()
 
-	def update(self, T0):
-		# doing some setum internal math
-		self.aCellH = self.h / self.n
-		self.aCellsT = np.array([T0 for i in range(self.n)])
-		self.Q = np.zeros(self.n)
+    def update(self, T0):
+        # doing some setum internal math
+        self.aCellH = self.h / self.n
+        self.aCellsT = np.array([T0 for i in range(self.n)])
+        self.Q = np.zeros(self.n)
 
-	def resetQ(self):
-		self.Q *= 0
+    def resetQ(self):
+        self.Q *= 0
 
-	def addQ(self, Y, Qin, phases=3):
-		self.Q[self.airCell(Y)] += Qin * phases
+    def addQ(self, Y, Qin, phases=3):
+        self.Q[self.airCell(Y)] += Qin * phases
 
-	def airCell(self, Y):
-		# pointing any Y to propper air cell number
-		n = int(Y // self.aCellH)
-		# return (self.n - min(n, self.n)) - 1 # need to really rethink this
-		return min(n, self.n-1) # this oryginal logical one
+    def airCell(self, Y):
+        # pointing any Y to propper air cell number
+        n = int(Y // self.aCellH)
+        # return (self.n - min(n, self.n)) - 1 # need to really rethink this
+        return min(n, self.n-1)  # this oryginal logical one
 
-	def T(self, Y):
-		# function returning the temperature at given height
-		return self.aCellsT[self.airCell(Y)]
+    def T(self, Y):
+        # function returning the temperature at given height
+        return self.aCellsT[self.airCell(Y)]
 
-	def setG(self, Gup=5, Gdwn=0, Gout=2):
-	# def setG(self, Gup=0, Gdwn=0, Gout=1):
-		# Gup is thermal cond to the top
-		# Gdwn is thermal cond down
-		# Gout is thermal cond out of system
-		
-		# generating the G matrix
-		self.G = np.zeros((self.n, self.n)) # preparing the G empty matrix
-		
-		for i in range(self.n):
-			for j in range(self.n):
-				# lets treat j as row i as col
-				if i == j: # the N case
-					self.G[i][j] = +Gup +Gdwn +Gout
-				elif i == j-1: # the N-1 case
-					self.G[i][j] = -Gdwn
-				elif i == j+1: # the N+1 case
-					self.G[i][j] = -Gup
+    def setG(self, Gup=5, Gdwn=0, Gout=2):
+        # def setG(self, Gup=0, Gdwn=0, Gout=1):
+        # Gup is thermal cond to the top
+        # Gdwn is thermal cond down
+        # Gout is thermal cond out of system
 
-		self.invG = np.linalg.inv(self.G)
+        # generating the G matrix
+        self.G = np.zeros((self.n, self.n))  # preparing the G empty matrix
 
+        for i in range(self.n):
+            for j in range(self.n):
+                # lets treat j as row i as col
+                if i == j:  # the N case
+                    self.G[i][j] = +Gup + Gdwn + Gout
+                elif i == j-1:  # the N-1 case
+                    self.G[i][j] = -Gdwn
+                elif i == j+1:  # the N+1 case
+                    self.G[i][j] = -Gup
 
+        self.invG = np.linalg.inv(self.G)
 
-	def solveT(self, srt=True):
-		"""
-		this is about update internal T solve
-		Q is the input power vector or lenght n
-		
-		"""
-		dT = np.matmul(self.invG, self.Q)
-		self.aCellsT = dT + self.T0
-		if srt:
-			self.aCellsT = np.sort(self.aCellsT)
+    def solveT(self, srt=True):
+        """
+        this is about update internal T solve
+        Q is the input power vector or lenght n
+
+        """
+        dT = np.matmul(self.invG, self.Q)
+        self.aCellsT = dT + self.T0
+        if srt:
+            self.aCellsT = np.sort(self.aCellsT)

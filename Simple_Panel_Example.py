@@ -106,29 +106,30 @@ maxY += 300
 
 # setting current as function of time [s]
 def Iload(time):
-    if time < 3600:
+    if time < 6*3600:
         return 1500 #A constant value for now.
     else:
         return 0 #A constant value for now.
 
   
 # Defining the air object
-air = tntA.airAdvance( 10, # n of elements
+air = tntA.airAdvance(  10, # n of elements
                         2300, # total height [mm]
                         35, # initial temperature degC
                         HTC=5, # Heat exchange ratio to the "air in infinity"
                         rAir=300, # radius of the air object cylinder [mm]
                         phases=3, # number of phases represented by the geomentry
                         linear=1, # if True (or 1) the Air temperature will be made as linear function of height
-                        sort=0) # if True (or 1) the Air elements are sorted from the coolest one to hottest (on top)
+                        sort=1) # if True (or 1) the Air elements are sorted from the coolest one to hottest (on top)
 # Running the solver 
 A,B,s, L2, _, air = tntS.SolverAdvance(PC_VBB, # element list
                                         Iload, # current description - in [A]
                                         air, # air model to be used
                                         35, # initial temperature [deg C]
-                                        6*60*60, # analysis time [s]
+                                        12*60*60, # analysis time [s]
                                         5, # Initial time step [s] - is auto regulated by solver
-                                        0.01) # allowed max temperature change in one step [K]
+                                        0.01, # allowed max temperature change in one step [K]
+                                        maxTimeStep = 0.1) # maximum timestep
 
 # this returns:
 #  A vector of time for each step - as the timestep can vary its needed for plots.
@@ -149,7 +150,7 @@ t = t / (60*60) # Time in hours
 
 # preparing temp rises as results
 b = np.array(B)
-b = b - air.T0
+# b = b - air.T0
 
 # defining the main plot window
 fig = plt.figure('Temperature Rise Analysis ')
@@ -189,7 +190,6 @@ ax4.plot(B[-1],[element.y for element in PC_VBB],'r--', label='nodes')
 plt.xlabel('Temp [degC]')
 plt.legend()
 
-plt.tight_layout()
 
 # plot samej temperatury powietrza. 
 # figG3 = plt.figure('Air temperature')
@@ -200,4 +200,21 @@ axG3.set_title("Air temp vs. time")
 axG4 = fig.add_subplot(236)
 axG4.bar(range(air.n),np.array(air.T_array[-1]))
 axG4.set_title("Air segments temp")
+
+plt.tight_layout()
+
+
+fig2 = plt.figure('Air debug plots')
+debug1 = fig2.add_subplot(131)
+debug1.plot(np.array(air.T_array))
+debug1.set_title('Temperatures')
+
+debug2 = fig2.add_subplot(132)
+debug2.plot(np.array(air.Q_array))
+debug2.set_title('internalQ')
+
+debug3 = fig2.add_subplot(133)
+debug3.plot(np.array(air.Qout_array))
+debug3.set_title('Qout')
+
 plt.show()

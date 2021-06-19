@@ -207,12 +207,12 @@ def SolverAdvance(Elements,
 			Qrad = element.Qrad(elementPrevTemp, elementTamb) 
 			Q -= Qrad
 
-			# preparing for Air update basd on Qconv for all elements
+			# preparing for Air update based on Qconv for all elements
 			air_input.append((Qconv+Qrad, element.y))
 
 			# ###################################################
 			# solving the conduction heat transfer
-			# based on the element internal lists of neighbours
+			# based on the element internal lists of neighbors
 
 			# incoming heat transfer (as per arrows in scheme)
 			if len(element.inputs) > 0:
